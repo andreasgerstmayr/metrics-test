@@ -1,0 +1,45 @@
+apiVersion: opentelemetry.io/v1alpha1
+kind: OpenTelemetryCollector
+metadata:
+  name: otel-central
+spec:
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.96.0
+  config: |
+    extensions:
+      oidc:
+        issuer_url: https://keycloak-test.apps-crc.testing/realms/master
+        issuer_ca_path: /var/run/tls/keycloak/ca.crt
+        audience: otel-collector
+
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            tls:
+              cert_file: /var/run/tls/otel/tls.crt
+              key_file: /var/run/tls/otel/tls.key
+            auth: 
+              authenticator: oidc
+
+    exporters:
+      debug:
+        verbosity: detailed
+
+    service:
+      extensions: [oidc]
+      pipelines:
+        traces:
+          receivers: [otlp]
+          exporters: [debug]
+  volumeMounts:
+  - mountPath: /var/run/tls/keycloak
+    name: keycloak-ca
+  - mountPath: /var/run/tls/otel
+    name: otel-central-collector-certs
+  volumes:
+  - name: keycloak-ca
+    configMap:
+      name: keycloak-test.apps-crc.testing-ca
+  - name: otel-central-collector-certs
+    secret:
+      secretName: otel-central-collector-certs

@@ -1,0 +1,50 @@
+apiVersion: opentelemetry.io/v1alpha1
+kind: OpenTelemetryCollector
+metadata:
+  name: otel-client
+spec:
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.96.0
+  config: |
+    extensions:
+      oauth2client:
+        client_id: otel-client
+        client_secret: NZsy3ugdGyZyZJ6iiYwDElnDgxwywYuW # notsecret
+        token_url: https://keycloak-test.apps-crc.testing/realms/master/protocol/openid-connect/token
+        tls:
+          ca_file: /var/run/tls/keycloak/ca.crt
+
+    receivers:
+      otlp:
+        protocols:
+          http:
+
+    exporters:
+      otlp:
+        endpoint: otel-central-collector:4317
+        tls:
+          ca_file: /var/run/tls/otel/ca.crt
+        auth:
+          authenticator: oauth2client
+
+    service:
+      extensions: [oauth2client]
+      pipelines:
+        traces:
+          receivers: [otlp]
+          exporters: [otlp]
+  ingress:
+    type: route
+    route:
+      termination: insecure
+  volumeMounts:
+  - mountPath: /var/run/tls/otel
+    name: otel-central-collector-ca
+  - mountPath: /var/run/tls/keycloak
+    name: keycloak-ca
+  volumes:
+  - name: otel-central-collector-ca
+    configMap:
+      name: otel-central-collector-ca
+  - name: keycloak-ca
+    configMap:
+      name: keycloak-test.apps-crc.testing-ca
