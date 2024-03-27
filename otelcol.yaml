@@ -1,0 +1,65 @@
+apiVersion: opentelemetry.io/v1alpha1
+kind: OpenTelemetryCollector
+metadata:
+  name: otel
+spec:
+  image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.96.0
+  config: |
+    receivers:
+      prometheus:
+        config:
+          scrape_configs:
+          - job_name: 'metrics-test'
+            scrape_interval: 2s
+            static_configs:
+            - targets: ['metrics-test.test.svc.cluster.local:8080']
+
+    exporters:
+      prometheus:
+        endpoint: 0.0.0.0:8080
+
+    processors:
+      cumulativetodelta:
+        include:
+          match_type: regexp
+          metrics:
+          - "^test_example_counte*$"
+
+    service:
+      pipelines:
+        metrics:
+          receivers: [prometheus]
+          processors: [cumulativetodelta]
+          exporters: [prometheus]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metrics-test
+spec:
+  selector:
+    matchLabels:
+      app: metrics-test
+  template:
+    metadata:
+      labels:
+        app: metrics-test
+    spec:
+      containers:
+      - name: metrics-test
+        image: docker.io/andreasgerstmayr/metrics-test
+        ports:
+        - containerPort: 8080
+          name: metrics
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: metrics-test
+spec:
+  selector:
+    app: metrics-test
+  ports:
+  - name: metrics
+    port: 8080
+    targetPort: metrics
